@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NFC Bro</string>
+    <string name="hce_service_desc">NFC Bro tag emulation</string>
+    <string name="hce_aid_desc">NDEF tag emulation</string>
+</resources>
