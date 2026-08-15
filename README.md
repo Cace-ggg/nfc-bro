@@ -6,10 +6,11 @@
 
 **A fast, low-power NFC toolkit for Android — read, write, emulate.**
 
-![Version](https://img.shields.io/badge/version-1.0.0-2456e6)
+[![Release](https://img.shields.io/github/v/release/MarcoZorn/nfc-bro?color=2456e6&label=release)](https://github.com/MarcoZorn/nfc-bro/releases/latest)
 ![Platform](https://img.shields.io/badge/platform-Android%207.0%2B-3ddc84)
 ![minSdk](https://img.shields.io/badge/minSdk-24-555)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+[![Build](https://github.com/MarcoZorn/nfc-bro/actions/workflows/build.yml/badge.svg)](https://github.com/MarcoZorn/nfc-bro/actions/workflows/build.yml)
 
 </div>
 
