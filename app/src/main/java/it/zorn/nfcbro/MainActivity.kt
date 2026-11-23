@@ -58,11 +58,13 @@ class MainActivity : ComponentActivity() {
             if (shotTab == "READ") vm.showSampleTag()
             return
         }
+        vm.setForeground(true)
         updateNfcState()
         enableReader()
     }
 
     override fun onPause() {
+        vm.setForeground(false)
         super.onPause()
         adapter?.disableReaderMode(this)
     }
@@ -97,7 +99,7 @@ class MainActivity : ComponentActivity() {
         val options = Bundle().apply {
             putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250)
         }
-        a.enableReaderMode(this, { tag: Tag -> vm.handleTag(tag) }, flags, options)
+        a.enableReaderMode(this, { tag: Tag -> vm.handleTag(tag, fromReader = true) }, flags, options)
     }
 
     private fun handleIntent(intent: Intent?) {

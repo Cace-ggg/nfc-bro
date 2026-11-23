@@ -11,17 +11,29 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import it.zorn.nfcbro.data.HistoryEntry
 import it.zorn.nfcbro.data.Store
+import it.zorn.nfcbro.nfc.CommandBatch
+import it.zorn.nfcbro.nfc.CommandResult
+import it.zorn.nfcbro.nfc.Hex
 import it.zorn.nfcbro.nfc.MemoryDumper
 import it.zorn.nfcbro.nfc.OpOutcome
 import it.zorn.nfcbro.nfc.RawCommander
+import it.zorn.nfcbro.nfc.RawConnection
 import it.zorn.nfcbro.nfc.TagInfo
 import it.zorn.nfcbro.nfc.TagReader
 import it.zorn.nfcbro.nfc.TagWriter
+import it.zorn.nfcbro.nfc.rawTransport
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 sealed interface Pending {
     val prompt: String
@@ -33,9 +45,6 @@ sealed interface Pending {
     data object Erase : Pending { override val prompt = "Hold a tag to erase it" }
     data object Format : Pending { override val prompt = "Hold a tag to format it" }
     data object Dump : Pending { override val prompt = "Hold a tag to read its memory" }
-    data class Raw(val command: ByteArray) : Pending {
-        override val prompt = "Hold a tag to send the command"
-    }
 }
 
 class NfcViewModel(app: Application) : AndroidViewModel(app) {
@@ -51,6 +60,22 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _nfcState = MutableStateFlow(NfcState.UNKNOWN)
     val nfcState: StateFlow<NfcState> = _nfcState.asStateFlow()
+
+    private val _rawState = MutableStateFlow(RawState())
+    val rawState = _rawState.asStateFlow()
+
+    private val _rawLog = MutableStateFlow<List<CommandResult>>(emptyList())
+    val rawLog = _rawLog.asStateFlow()
+
+    private val nfcMutex = Mutex()
+    private val raw = RawCommander()
+    private var rawVisible = false
+    private var foreground = false
+    private var rawRevision = 0L
+    private var rawTask: Job? = null
+    private var presenceTask: Job? = null
+    private var lastRawTag: Tag? = null
+    private var ignoredRawTag: Tag? = null
 
     fun setNfcState(state: NfcState) { _nfcState.value = state }
 
@@ -78,6 +103,7 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun start(pending: Pending) {
+        if (rawVisible) closeRaw()
         _lastResult.value = null
         _awaiting.value = pending
     }
@@ -86,19 +112,122 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
 
     fun consumeResult() { _lastResult.value = null }
 
-    fun handleTag(tag: Tag) {
-        viewModelScope.launch(Dispatchers.IO) {
-            feedback()
-            when (val pending = _awaiting.value) {
-                null -> passiveRead(tag)
-                is Pending.Write -> finish(TagWriter.write(tag, pending.message))
-                Pending.Lock -> finish(TagWriter.makeReadOnly(tag))
-                Pending.Erase -> finish(TagWriter.erase(tag))
-                Pending.Format -> finish(TagWriter.format(tag))
-                Pending.Dump -> finish(MemoryDumper.dump(tag))
-                is Pending.Raw -> finish(RawCommander.send(tag, pending.command))
+    fun setForeground(value: Boolean) {
+        foreground = value
+        updatePresenceTask()
+    }
+
+    fun setRawVisible(value: Boolean) {
+        rawVisible = value
+        updatePresenceTask()
+    }
+
+    private fun updatePresenceTask() {
+        if (!foreground || !rawVisible) {
+            presenceTask?.cancel()
+            presenceTask = null
+            closeRaw()
+        } else if (presenceTask == null) {
+            presenceTask = viewModelScope.launch {
+                while (true) {
+                    delay(300)
+                    if (_rawState.value.connection == null || _rawState.value.busy) continue
+                    nfcMutex.withLock {
+                        if (_rawState.value.connection == null || _rawState.value.busy) return@withLock
+                        if (!withContext(Dispatchers.IO) { raw.checkPresence() }) {
+                            lastRawTag = null
+                            _rawState.value = RawState(message = "Tag removed. Tap again.")
+                        }
+                    }
+                }
             }
         }
+    }
+
+    fun disconnectRaw() {
+        ignoredRawTag = lastRawTag
+        closeRaw("Disconnected. Remove the tag and tap again.")
+    }
+
+    private fun closeRaw(message: String = RawState.WAITING) {
+        rawRevision++
+        rawTask?.cancel()
+        lastRawTag = null
+        _rawState.value = RawState(message = message)
+        viewModelScope.launch {
+            nfcMutex.withLock { withContext(Dispatchers.IO) { raw.close() } }
+        }
+    }
+
+    fun sendRaw(batch: CommandBatch, connectionId: Long, stopOnError: Boolean, confirmed: Boolean = false) {
+        val state = _rawState.value
+        val connection = state.connection ?: return
+        if (!foreground || !rawVisible || state.busy || connection.id != connectionId) return
+        if (connection.isApdu && batch.hasShortApdu) return
+        if (batch.requiresConfirmation(connection.isApdu) && !confirmed) return
+        rawTask = viewModelScope.launch {
+            _rawState.value = state.copy(busy = true)
+            nfcMutex.withLock {
+                if (_rawState.value.connection?.id != connectionId) return@withLock
+                val error = withContext(Dispatchers.IO) {
+                    if (raw.connection?.id != connectionId) return@withContext "Not connected. Tap a tag."
+                    raw.execute(batch, stopOnError) { result -> _rawLog.update { it + result } }
+                }
+                _rawState.value = if (error == null) state else RawState(message = error)
+                if (error != null) lastRawTag = null
+            }
+        }
+    }
+
+    fun handleTag(tag: Tag, fromReader: Boolean = false) {
+        viewModelScope.launch {
+            if (fromReader && !foreground) return@launch
+            nfcMutex.withLock {
+                if (fromReader && !foreground) return@withLock
+                val pending = _awaiting.value
+                if (pending == null && foreground && rawVisible) {
+                    if (tag !== ignoredRawTag) {
+                        ignoredRawTag = null
+                        connectRaw(tag)
+                    }
+                } else {
+                    withContext(Dispatchers.IO) {
+                        feedback()
+                        when (pending) {
+                            null -> passiveRead(tag)
+                            is Pending.Write -> finish(TagWriter.write(tag, pending.message))
+                            Pending.Lock -> finish(TagWriter.makeReadOnly(tag))
+                            Pending.Erase -> finish(TagWriter.erase(tag))
+                            Pending.Format -> finish(TagWriter.format(tag))
+                            Pending.Dump -> finish(MemoryDumper.dump(tag))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun connectRaw(tag: Tag) {
+        val revision = rawRevision
+        val (connection, error) = withContext(Dispatchers.IO) {
+            val previous = raw.connection
+            val error = raw.connect(Hex.pretty(tag.id ?: byteArrayOf())) { rawTransport(tag) }
+            if (error != null || raw.connection?.id != previous?.id) {
+                feedback()
+                passiveRead(tag)
+            }
+            raw.connection to error
+        }
+        if (revision != rawRevision) return
+        lastRawTag = if (connection != null) tag else null
+        if (_rawState.value.connection?.id != connection?.id || error != null) {
+            _rawState.value = RawState(connection, error ?: RawState.WAITING)
+        }
+    }
+
+    override fun onCleared() {
+        CoroutineScope(Dispatchers.IO).launch { nfcMutex.withLock { raw.close() } }
+        super.onCleared()
     }
 
     private fun passiveRead(tag: Tag) {
@@ -133,6 +262,16 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 enum class NfcState { UNKNOWN, MISSING, DISABLED, READY }
+
+data class RawState(
+    val connection: RawConnection? = null,
+    val message: String = WAITING,
+    val busy: Boolean = false,
+) {
+    companion object {
+        const val WAITING = "Disconnected. Hold a tag near the phone."
+    }
+}
 
 private fun TagInfo.toHistoryEntry() = HistoryEntry(
     id = "$uid-$scannedAtMs",

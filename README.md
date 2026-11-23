@@ -59,8 +59,14 @@ One-tap writing for every record people actually use:
 - **Memory dump** for MIFARE Ultralight, MIFARE Classic (with the common default
   keys) and ISO 15693 (NfcV)
 - **Erase**, **format to NDEF**, and **lock** a tag permanently read-only
-- **Raw command console** — send APDUs / raw frames over IsoDep, NfcA or NfcV and
-  read the response in hex
+- **APDU console** — hold a tag near the phone in Tools to connect. Send one hex
+  command or a batch (one per line) without removing the tag. The console shows
+  responses in hex and ASCII, decodes APDU status words, and copies the full
+  transcript. Stop on card error is enabled by default.
+- **Read-only by default** — enable writes and confirm each batch that contains a
+  write or unrecognized command. After writing, send a separate read command to
+  verify the result. NfcA and NfcV raw frames are still supported and always
+  require confirmation because their meanings depend on the tag.
 
 ### The rest
 - Scan **history** with per-tag detail

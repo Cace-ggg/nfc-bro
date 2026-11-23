@@ -75,7 +75,7 @@ fun App(vm: NfcViewModel, startTab: String? = null, startOverlay: String? = null
     // Simple outcomes flash a snackbar; data-bearing ones open a dialog (handled below).
     LaunchedEffect(result) {
         val r = result
-        if (r != null && r !is OpOutcome.Dumped && r !is OpOutcome.Raw) {
+        if (r != null && r !is OpOutcome.Dumped) {
             snackbar.showSnackbar(r.message)
             vm.consumeResult()
         }
@@ -156,7 +156,7 @@ fun App(vm: NfcViewModel, startTab: String? = null, startOverlay: String? = null
     }
 
     val r = result
-    if (r is OpOutcome.Dumped || r is OpOutcome.Raw) {
+    if (r is OpOutcome.Dumped) {
         ResultDialog(outcome = r, onDismiss = { vm.consumeResult() })
     }
 }

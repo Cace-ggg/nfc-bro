@@ -42,6 +42,5 @@ sealed interface OpOutcome {
     data class Erased(override val ok: Boolean, override val message: String) : OpOutcome
     data class Formatted(override val ok: Boolean, override val message: String) : OpOutcome
     data class Dumped(val dump: MemoryDump?, override val ok: Boolean, override val message: String) : OpOutcome
-    data class Raw(val request: String, val response: String, override val ok: Boolean, override val message: String) : OpOutcome
     data class Failed(override val message: String) : OpOutcome { override val ok = false }
 }
