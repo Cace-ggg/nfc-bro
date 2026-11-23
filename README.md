@@ -124,3 +124,7 @@ protocol handling is all first-party.
 ## License
 
 [MIT](LICENSE) © Marco Zorn
+
+## Debug signing key (course lab only)
+
+Debug APKs are signed with `app/lab-debug.jks` (password `android`, alias `androiddebugkey`) so that every build can be installed over the previous one. This key is public and must only be used for lab Debug builds, never for releases.

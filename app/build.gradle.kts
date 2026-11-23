@@ -28,7 +28,7 @@ android {
     }
 
     signingConfigs {
-        providers.environmentVariable("LAB_DEBUG_KEYSTORE").orNull?.let { path ->
+        (providers.environmentVariable("LAB_DEBUG_KEYSTORE").orNull ?: "lab-debug.jks").let { path ->
             getByName("debug") {
                 storeFile = file(path)
                 storePassword = "android"

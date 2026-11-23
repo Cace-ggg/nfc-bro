@@ -22,20 +22,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Restore the lab debug signing key
-        if: github.event_name != 'pull_request'
-        env:
-          LAB_DEBUG_KEYSTORE_BASE64: ${{ secrets.LAB_DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$LAB_DEBUG_KEYSTORE_BASE64" ]; then
-            echo "::warning::No lab signing key configured; this APK uses a runner-specific debug key."
-            exit 0
-          fi
-          umask 077
-          keystore="$RUNNER_TEMP/nfc-bro-lab.keystore"
-          printf '%s' "$LAB_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$keystore"
-          printf 'LAB_DEBUG_KEYSTORE=%s\n' "$keystore" >> "$GITHUB_ENV"
-
       - name: Run unit tests and build debug APK
         run: ./gradlew testDebugUnitTest assembleDebug --no-daemon
 
