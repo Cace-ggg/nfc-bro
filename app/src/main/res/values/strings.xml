@@ -99,6 +99,7 @@
     <string name="send_command">Send command</string>
     <string name="communication_log">Communication log</string>
     <string name="copy_full_log">Copy full log</string>
+    <string name="clear_log">Clear log</string>
     <string name="confirm_write_title">Send commands that may modify the tag?</string>
     <string name="confirm_write_body">This will send %1$d command(s) to the connected tag. Changes may be permanent.</string>
     <string name="confirm_send">Confirm and send</string>

@@ -32,6 +32,27 @@ class RawCommanderTest {
     }
 
     @Test
+    fun clearingTranscriptKeepsSessionOpenForNewEntries() = runBlocking {
+        val raw = RawCommander()
+        val tag = FakeTransport { Hex.decode("9000") }
+        assertNull(raw.connect("01") { tag })
+        val connection = raw.connection
+        val transcript = RawTranscript()
+        raw.execute(CommandBatch.parse("00A40000"), true, transcript::append)
+        assertEquals(listOf("00 A4 00 00"), transcript.entries.value.map { it.request })
+
+        transcript.clear()
+        assertEquals(emptyList<CommandResult>(), transcript.entries.value)
+        assertEquals(connection, raw.connection)
+
+        raw.execute(CommandBatch.parse("00B0000004"), true, transcript::append)
+        assertEquals(listOf("00 B0 00 00 04"), transcript.entries.value.map { it.request })
+        assertEquals(1, tag.connections)
+        assertEquals(0, tag.closes)
+        raw.close()
+    }
+
+    @Test
     fun stopsOnCardErrorOnlyWhenSelected() = runBlocking {
         val raw = RawCommander()
         val batch = CommandBatch.parse("00A40000\n00B0000004")

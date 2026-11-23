@@ -15,12 +15,12 @@ import androidx.lifecycle.viewModelScope
 import it.zorn.nfcbro.data.HistoryEntry
 import it.zorn.nfcbro.data.Store
 import it.zorn.nfcbro.nfc.CommandBatch
-import it.zorn.nfcbro.nfc.CommandResult
 import it.zorn.nfcbro.nfc.Hex
 import it.zorn.nfcbro.nfc.MemoryDumper
 import it.zorn.nfcbro.nfc.OpOutcome
 import it.zorn.nfcbro.nfc.RawCommander
 import it.zorn.nfcbro.nfc.RawConnection
+import it.zorn.nfcbro.nfc.RawTranscript
 import it.zorn.nfcbro.nfc.TagInfo
 import it.zorn.nfcbro.nfc.TagReader
 import it.zorn.nfcbro.nfc.TagWriter
@@ -32,7 +32,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -67,8 +66,10 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
     private val _rawState = MutableStateFlow(RawState())
     val rawState = _rawState.asStateFlow()
 
-    private val _rawLog = MutableStateFlow<List<CommandResult>>(emptyList())
-    val rawLog = _rawLog.asStateFlow()
+    private val transcript = RawTranscript()
+    val rawLog = transcript.entries
+
+    fun clearRawLog() = transcript.clear()
 
     private val nfcMutex = Mutex()
     private val raw = RawCommander()
@@ -175,7 +176,7 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
                 if (_rawState.value.connection?.id != connectionId) return@withLock
                 val error = withContext(Dispatchers.IO) {
                     if (raw.connection?.id != connectionId) return@withContext R.string.nfc_not_connected
-                    raw.execute(batch, stopOnError) { result -> _rawLog.update { it + result } }
+                    raw.execute(batch, stopOnError, transcript::append)
                 }
                 _rawState.value = if (error == null) state else RawState(message = error)
                 if (error != null) lastRawTag = null

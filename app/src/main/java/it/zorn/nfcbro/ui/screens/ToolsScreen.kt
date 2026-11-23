@@ -2,6 +2,8 @@ package it.zorn.nfcbro.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -88,6 +90,7 @@ fun ToolsScreen(vm: NfcViewModel) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ApduConsole(vm: NfcViewModel) {
     val state by vm.rawState.collectAsState()
@@ -167,11 +170,19 @@ private fun ApduConsole(vm: NfcViewModel) {
         }
     }
 
-    if (log.isNotEmpty()) {
-        SectionCard(title = stringResource(R.string.communication_log)) {
-            OutlinedButton(onClick = { clipboard.setText(AnnotatedString(transcript)) }) {
+    SectionCard(title = stringResource(R.string.communication_log)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { clipboard.setText(AnnotatedString(transcript)) },
+                enabled = log.isNotEmpty(),
+            ) {
                 Text(stringResource(R.string.copy_full_log))
             }
+            OutlinedButton(onClick = vm::clearRawLog, enabled = log.isNotEmpty()) {
+                Text(stringResource(R.string.clear_log))
+            }
+        }
+        if (log.isNotEmpty()) {
             Text(transcript, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
         }
     }
