@@ -25,8 +25,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import it.zorn.nfcbro.R
 import it.zorn.nfcbro.data.Store
 import it.zorn.nfcbro.ui.components.SectionCard
 
@@ -40,30 +42,30 @@ fun EmulateScreen() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(title = "Tag emulation") {
+        SectionCard(title = stringResource(R.string.tag_emulation)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Broadcast as an NDEF tag", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.broadcast_ndef), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                 Switch(
                     checked = emu.enabled,
                     onCheckedChange = { on -> Store.updateEmulation { it.copy(enabled = on) } },
                 )
             }
             Text(
-                "When enabled, present the back of your phone to any NFC reader and it will read the payload below as a Type 4 tag.",
+                stringResource(R.string.emulation_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        SectionCard(title = "Payload") {
+        SectionCard(title = stringResource(R.string.payload)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = kind == "text", onClick = { kind = "text" }, label = { Text("Text") })
-                FilterChip(selected = kind == "url", onClick = { kind = "url" }, label = { Text("Link") })
+                FilterChip(selected = kind == "text", onClick = { kind = "text" }, label = { Text(stringResource(R.string.text)) })
+                FilterChip(selected = kind == "url", onClick = { kind = "url" }, label = { Text(stringResource(R.string.link)) })
             }
             OutlinedTextField(
                 value = content,
                 onValueChange = { content = it },
-                label = { Text(if (kind == "url") "URL" else "Text") },
+                label = { Text(if (kind == "url") stringResource(R.string.url) else stringResource(R.string.text)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(
@@ -71,16 +73,14 @@ fun EmulateScreen() {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Outlined.Save, null)
-                Text("  Save payload")
+                Text(stringResource(R.string.save_payload), modifier = Modifier.padding(start = 8.dp))
             }
             Spacer(Modifier.padding(0.dp))
         }
 
-        SectionCard(title = "Good to know") {
+        SectionCard(title = stringResource(R.string.good_to_know)) {
             Text(
-                "Android emulates ISO-DEP (Type 4) tags only. NFC Bro can broadcast NDEF content, " +
-                    "but the platform does not allow cloning a tag's UID or emulating MIFARE Classic / " +
-                    "Ultralight tags — that needs specialised hardware.",
+                stringResource(R.string.emulation_limit),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

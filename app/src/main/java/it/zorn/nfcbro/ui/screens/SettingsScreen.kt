@@ -1,8 +1,12 @@
 package it.zorn.nfcbro.ui.screens
 
 import android.os.Build
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,13 +27,16 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import it.zorn.nfcbro.BuildConfig
+import it.zorn.nfcbro.R
 import it.zorn.nfcbro.data.Store
 import it.zorn.nfcbro.ui.components.KeyValue
 import it.zorn.nfcbro.ui.components.SectionCard
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val settings by Store.settings.collectAsState()
@@ -39,40 +46,55 @@ fun SettingsScreen(onBack: () -> Unit) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(title = "Appearance") {
-            Text("Theme", style = MaterialTheme.typography.bodyMedium)
+        SectionCard(title = stringResource(R.string.appearance)) {
+            Text(stringResource(R.string.theme), style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (key, label) ->
+                listOf("system" to R.string.system, "light" to R.string.light, "dark" to R.string.dark).forEach { (key, label) ->
                     FilterChip(
                         selected = settings.theme == key,
                         onClick = { Store.updateSettings { it.copy(theme = key) } },
-                        label = { Text(label) },
+                        label = { Text(stringResource(label)) },
                     )
                 }
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                SwitchRow("Dynamic colour (Material You)", settings.dynamicColor) { on ->
+                SwitchRow(stringResource(R.string.dynamic_color), settings.dynamicColor) { on ->
                     Store.updateSettings { it.copy(dynamicColor = on) }
                 }
             }
         }
 
-        SectionCard(title = "Scanning") {
-            SwitchRow("Sound on scan", settings.soundOnScan) { on ->
+        SectionCard(title = stringResource(R.string.language)) {
+            val current = AppCompatDelegate.getApplicationLocales()
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("" to R.string.follow_system, "zh-CN" to R.string.language_chinese, "en" to R.string.language_english)
+                    .forEach { (tag, label) ->
+                        val locales = LocaleListCompat.forLanguageTags(tag)
+                        FilterChip(
+                            selected = current == locales,
+                            onClick = { AppCompatDelegate.setApplicationLocales(locales) },
+                            label = { Text(stringResource(label)) },
+                        )
+                    }
+            }
+        }
+
+        SectionCard(title = stringResource(R.string.scanning)) {
+            SwitchRow(stringResource(R.string.scan_sound), settings.soundOnScan) { on ->
                 Store.updateSettings { it.copy(soundOnScan = on) }
             }
-            SwitchRow("Vibrate on scan", settings.vibrateOnScan) { on ->
+            SwitchRow(stringResource(R.string.scan_vibrate), settings.vibrateOnScan) { on ->
                 Store.updateSettings { it.copy(vibrateOnScan = on) }
             }
-            SwitchRow("Save scans to history", settings.addToHistory) { on ->
+            SwitchRow(stringResource(R.string.scan_history), settings.addToHistory) { on ->
                 Store.updateSettings { it.copy(addToHistory = on) }
             }
         }
 
-        SectionCard(title = "About") {
-            KeyValue("Version", BuildConfig.VERSION_NAME)
+        SectionCard(title = stringResource(R.string.about)) {
+            KeyValue(stringResource(R.string.version), BuildConfig.VERSION_NAME)
             Text(
-                "NFC Bro — a fast, low-power NFC toolkit for reading, writing and emulating tags.",
+                stringResource(R.string.about_app),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

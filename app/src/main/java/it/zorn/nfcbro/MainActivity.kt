@@ -4,10 +4,10 @@ import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,7 +21,7 @@ import it.zorn.nfcbro.ui.NfcState
 import it.zorn.nfcbro.ui.NfcViewModel
 import it.zorn.nfcbro.ui.theme.NfcBroTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val vm: NfcViewModel by viewModels()
     private var adapter: NfcAdapter? = null

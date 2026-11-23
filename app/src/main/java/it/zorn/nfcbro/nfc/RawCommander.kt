@@ -6,6 +6,7 @@ import android.nfc.tech.IsoDep
 import android.nfc.tech.NfcA
 import android.nfc.tech.NfcV
 import android.nfc.tech.TagTechnology
+import it.zorn.nfcbro.R
 import java.io.IOException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -28,10 +29,10 @@ internal class RawCommander {
     private var transport: RawTransport? = null
     private var nextConnectionId = 0L
 
-    fun connect(uid: String, openTransport: () -> RawTransport?): String? {
+    fun connect(uid: String, openTransport: () -> RawTransport?): Int? {
         if (connection?.uid == uid && checkPresence()) return null
         close()
-        val next = openTransport() ?: return "This tag does not support IsoDep, NfcA or NfcV."
+        val next = openTransport() ?: return R.string.nfc_transport_unsupported
         transport = next
         return try {
             next.connect()
@@ -42,7 +43,7 @@ internal class RawCommander {
             e.nfcMessage()
         } catch (e: SecurityException) {
             close()
-            "Tag is no longer available. Tap again."
+            R.string.nfc_unavailable
         }
     }
 
@@ -56,8 +57,8 @@ internal class RawCommander {
         return present
     }
 
-    suspend fun execute(batch: CommandBatch, stopOnError: Boolean, onResult: (CommandResult) -> Unit): String? {
-        val link = transport ?: return "Not connected. Tap a tag."
+    suspend fun execute(batch: CommandBatch, stopOnError: Boolean, onResult: (CommandResult) -> Unit): Int? {
+        val link = transport ?: return R.string.nfc_not_connected
         for (command in batch.commands) {
             currentCoroutineContext().ensureActive()
             val request = Hex.pretty(command)
@@ -66,7 +67,7 @@ internal class RawCommander {
             } catch (e: IOException) {
                 return reportDisconnect(request, e.nfcMessage(), onResult)
             } catch (_: SecurityException) {
-                return reportDisconnect(request, "Tag is no longer available. Tap again.", onResult)
+                return reportDisconnect(request, R.string.nfc_unavailable, onResult)
             }
             val result = CommandResult(request, response, link.isApdu)
             onResult(result)
@@ -75,7 +76,7 @@ internal class RawCommander {
         return null
     }
 
-    private fun reportDisconnect(request: String, error: String, onResult: (CommandResult) -> Unit): String {
+    private fun reportDisconnect(request: String, error: Int, onResult: (CommandResult) -> Unit): Int {
         close()
         onResult(CommandResult(request, error = error))
         return error
@@ -132,6 +133,5 @@ private inline fun <T> withTagLoss(block: () -> T): T = try {
     throw RawTagLostException(e)
 }
 
-private fun IOException.nfcMessage(): String =
-    if (this is RawTagLostException) "Tag removed. Tap again."
-    else "NFC I/O error or timeout. Tap again."
+private fun IOException.nfcMessage(): Int =
+    if (this is RawTagLostException) R.string.nfc_removed else R.string.nfc_timeout

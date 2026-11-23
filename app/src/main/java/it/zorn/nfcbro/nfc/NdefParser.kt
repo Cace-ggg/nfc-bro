@@ -1,7 +1,9 @@
 package it.zorn.nfcbro.nfc
 
+import android.content.Context
 import android.nfc.NdefMessage
 import android.nfc.NdefRecord
+import it.zorn.nfcbro.R
 import java.nio.charset.Charset
 
 object NdefParser {
@@ -15,67 +17,67 @@ object NdefParser {
         "urn:epc:pat:", "urn:epc:raw:", "urn:epc:", "urn:nfc:"
     )
 
-    fun parse(message: NdefMessage?): List<NdefRecordInfo> =
-        message?.records?.map { parseRecord(it) } ?: emptyList()
+    fun parse(context: Context, message: NdefMessage?): List<NdefRecordInfo> =
+        message?.records?.map { parseRecord(context, it) } ?: emptyList()
 
-    fun parseRecord(record: NdefRecord): NdefRecordInfo {
+    fun parseRecord(context: Context, record: NdefRecord): NdefRecordInfo {
         val raw = Hex.pretty(record.payload)
         return when (record.tnf) {
-            NdefRecord.TNF_WELL_KNOWN -> parseWellKnown(record, raw)
-            NdefRecord.TNF_MIME_MEDIA -> parseMime(record, raw)
-            NdefRecord.TNF_EXTERNAL_TYPE -> parseExternal(record, raw)
+            NdefRecord.TNF_WELL_KNOWN -> parseWellKnown(context, record, raw)
+            NdefRecord.TNF_MIME_MEDIA -> parseMime(context, record, raw)
+            NdefRecord.TNF_EXTERNAL_TYPE -> parseExternal(context, record, raw)
             NdefRecord.TNF_ABSOLUTE_URI ->
-                NdefRecordInfo("URI", String(record.type, Charsets.UTF_8), "Absolute URI", raw)
+                NdefRecordInfo("URI", String(record.type, Charsets.UTF_8), context.getString(R.string.ndef_absolute_uri), raw)
             NdefRecord.TNF_EMPTY ->
-                NdefRecordInfo("Empty", "(empty record)", "TNF 0x00", raw)
+                NdefRecordInfo(context.getString(R.string.ndef_empty), context.getString(R.string.ndef_empty_record), "TNF 0x00", raw)
             else ->
-                NdefRecordInfo("Unknown", raw.ifEmpty { "(no payload)" }, "TNF 0x%02X".format(record.tnf), raw)
+                NdefRecordInfo(context.getString(R.string.unknown), raw.ifEmpty { context.getString(R.string.ndef_no_payload) }, "TNF 0x%02X".format(record.tnf), raw)
         }
     }
 
-    private fun parseWellKnown(record: NdefRecord, raw: String): NdefRecordInfo {
+    private fun parseWellKnown(context: Context, record: NdefRecord, raw: String): NdefRecordInfo {
         return when {
             record.type.contentEquals(NdefRecord.RTD_TEXT) -> {
                 val p = record.payload
-                if (p.isEmpty()) return NdefRecordInfo("Text", "", "empty", raw)
+                if (p.isEmpty()) return NdefRecordInfo(context.getString(R.string.text), "", context.getString(R.string.ndef_empty), raw)
                 val status = p[0].toInt()
                 val langLen = status and 0x3F
                 val charset = if (status and 0x80 == 0) Charsets.UTF_8 else Charset.forName("UTF-16")
                 val lang = String(p, 1, langLen, Charsets.US_ASCII)
                 val text = String(p, 1 + langLen, p.size - 1 - langLen, charset)
-                NdefRecordInfo("Text", text, "Language: $lang", raw)
+                NdefRecordInfo(context.getString(R.string.text), text, context.getString(R.string.ndef_language, lang), raw)
             }
             record.type.contentEquals(NdefRecord.RTD_URI) -> {
                 val p = record.payload
-                if (p.isEmpty()) return NdefRecordInfo("URI", "", "empty", raw)
+                if (p.isEmpty()) return NdefRecordInfo("URI", "", context.getString(R.string.ndef_empty), raw)
                 val idx = p[0].toInt() and 0xFF
                 val prefix = URI_PREFIXES.getOrElse(idx) { "" }
                 val uri = prefix + String(p, 1, p.size - 1, Charsets.UTF_8)
-                NdefRecordInfo("URI", uri, "URI record", raw)
+                NdefRecordInfo("URI", uri, context.getString(R.string.ndef_uri_record), raw)
             }
             record.type.contentEquals(byteArrayOf('S'.code.toByte(), 'p'.code.toByte())) ->
-                NdefRecordInfo("Smart Poster", summariseSmartPoster(record.payload), "Smart Poster", raw)
+                NdefRecordInfo(context.getString(R.string.ndef_smart_poster), summariseSmartPoster(context, record.payload), context.getString(R.string.ndef_smart_poster), raw)
             else ->
-                NdefRecordInfo("Well-known", String(record.payload, Charsets.UTF_8), "RTD: ${String(record.type, Charsets.UTF_8)}", raw)
+                NdefRecordInfo(context.getString(R.string.ndef_well_known), String(record.payload, Charsets.UTF_8), "RTD: ${String(record.type, Charsets.UTF_8)}", raw)
         }
     }
 
-    private fun summariseSmartPoster(payload: ByteArray): String = runCatching {
+    private fun summariseSmartPoster(context: Context, payload: ByteArray): String = runCatching {
         val inner = NdefMessage(payload)
-        parse(inner).joinToString(" · ") { "${it.kind}: ${it.summary}" }
+        parse(context, inner).joinToString(" · ") { "${it.kind}: ${it.summary}" }
     }.getOrDefault(Hex.pretty(payload))
 
-    private fun parseMime(record: NdefRecord, raw: String): NdefRecordInfo {
+    private fun parseMime(context: Context, record: NdefRecord, raw: String): NdefRecordInfo {
         val mime = record.toMimeType() ?: "application/octet-stream"
         return when {
             mime.equals("application/vnd.wfa.wsc", true) ->
-                NdefRecordInfo("Wi-Fi", parseWifiSsid(record.payload) ?: "Wi-Fi configuration", "Wi-Fi Simple Config", raw)
+                NdefRecordInfo(context.getString(R.string.wifi), parseWifiSsid(record.payload) ?: context.getString(R.string.ndef_wifi_config), context.getString(R.string.ndef_wifi_simple_config), raw)
             mime.contains("vcard", true) ->
-                NdefRecordInfo("Contact", String(record.payload, Charsets.UTF_8), mime, raw)
+                NdefRecordInfo(context.getString(R.string.contact), String(record.payload, Charsets.UTF_8), mime, raw)
             mime.startsWith("text/") ->
                 NdefRecordInfo("MIME", String(record.payload, Charsets.UTF_8), mime, raw)
             else ->
-                NdefRecordInfo("MIME", "${record.payload.size} bytes", mime, raw)
+                NdefRecordInfo("MIME", context.getString(R.string.ndef_bytes, record.payload.size), mime, raw)
         }
     }
 
@@ -95,12 +97,12 @@ object NdefParser {
         return null
     }
 
-    private fun parseExternal(record: NdefRecord, raw: String): NdefRecordInfo {
+    private fun parseExternal(context: Context, record: NdefRecord, raw: String): NdefRecordInfo {
         val type = String(record.type, Charsets.UTF_8)
         return if (type.equals("android.com:pkg", true)) {
-            NdefRecordInfo("Android App", String(record.payload, Charsets.UTF_8), "AAR", raw)
+            NdefRecordInfo(context.getString(R.string.ndef_android_app), String(record.payload, Charsets.UTF_8), "AAR", raw)
         } else {
-            NdefRecordInfo("External", String(record.payload, Charsets.UTF_8), type, raw)
+            NdefRecordInfo(context.getString(R.string.ndef_external), String(record.payload, Charsets.UTF_8), type, raw)
         }
     }
 }

@@ -1,9 +1,11 @@
 package it.zorn.nfcbro.nfc
 
+import android.content.Context
 import android.nfc.Tag
 import android.nfc.tech.MifareClassic
 import android.nfc.tech.MifareUltralight
 import android.nfc.tech.Ndef
+import it.zorn.nfcbro.R
 
 /** Static helpers to name manufacturers and tag types from a scanned [Tag]. */
 object TagTech {
@@ -23,15 +25,15 @@ object TagTech {
         0x39 to "MicroSensys",
     )
 
-    fun manufacturer(id: ByteArray): String {
-        if (id.isEmpty()) return "Unknown"
+    fun manufacturer(context: Context, id: ByteArray): String {
+        if (id.isEmpty()) return context.getString(R.string.unknown)
         val code = id[0].toInt() and 0xFF
-        return MANUFACTURERS[code] ?: "Unknown (0x%02X)".format(code)
+        return MANUFACTURERS[code] ?: context.getString(R.string.unknown_id, "0x%02X".format(code))
     }
 
     fun shortTech(tech: String): String = tech.substringAfterLast('.')
 
-    fun typeLabel(tag: Tag): String {
+    fun typeLabel(context: Context, tag: Tag): String {
         val techs = tag.techList
         if (MifareClassic::class.java.name in techs) {
             val size = runCatching { MifareClassic.get(tag)?.size ?: 0 }.getOrDefault(0)
@@ -43,19 +45,19 @@ object TagTech {
             return when (t) {
                 MifareUltralight.TYPE_ULTRALIGHT -> "MIFARE Ultralight"
                 MifareUltralight.TYPE_ULTRALIGHT_C -> "MIFARE Ultralight C"
-                else -> "MIFARE Ultralight family"
+                else -> context.getString(R.string.ultralight_family)
             }
         }
         if (Ndef::class.java.name in techs) {
             val type = runCatching { Ndef.get(tag)?.type }.getOrNull()
             when (type) {
-                Ndef.NFC_FORUM_TYPE_1 -> return "NFC Forum Type 1"
-                Ndef.NFC_FORUM_TYPE_2 -> return "NFC Forum Type 2"
-                Ndef.NFC_FORUM_TYPE_3 -> return "NFC Forum Type 3 (FeliCa)"
-                Ndef.NFC_FORUM_TYPE_4 -> return "NFC Forum Type 4"
+                Ndef.NFC_FORUM_TYPE_1 -> return context.getString(R.string.nfc_forum_type, 1)
+                Ndef.NFC_FORUM_TYPE_2 -> return context.getString(R.string.nfc_forum_type, 2)
+                Ndef.NFC_FORUM_TYPE_3 -> return context.getString(R.string.nfc_forum_felica)
+                Ndef.NFC_FORUM_TYPE_4 -> return context.getString(R.string.nfc_forum_type, 4)
                 Ndef.MIFARE_CLASSIC -> return "MIFARE Classic (NDEF)"
             }
         }
-        return techs.firstOrNull()?.let { shortTech(it) } ?: "Unknown"
+        return techs.firstOrNull()?.let { shortTech(it) } ?: context.getString(R.string.unknown)
     }
 }

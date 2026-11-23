@@ -22,19 +22,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import android.nfc.NdefMessage
+import it.zorn.nfcbro.R
 import it.zorn.nfcbro.nfc.NdefBuilder
 import it.zorn.nfcbro.ui.NfcViewModel
 import it.zorn.nfcbro.ui.Pending
 import it.zorn.nfcbro.ui.components.SectionCard
 
-private enum class RecordType(val label: String) {
-    TEXT("Text"), URL("Link"), WIFI("Wi-Fi"), CONTACT("Contact"),
-    PHONE("Phone"), SMS("SMS"), EMAIL("Email"), LOCATION("Location"),
-    APP("App"), CUSTOM("Custom"),
+private enum class RecordType(val label: Int) {
+    TEXT(R.string.text), URL(R.string.link), WIFI(R.string.wifi), CONTACT(R.string.contact),
+    PHONE(R.string.phone), SMS(R.string.sms), EMAIL(R.string.email), LOCATION(R.string.location),
+    APP(R.string.app), CUSTOM(R.string.custom),
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -51,55 +53,55 @@ fun WriteScreen(vm: NfcViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(title = "Record type") {
+        SectionCard(title = stringResource(R.string.record_type)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RecordType.entries.forEach { t ->
                     FilterChip(
                         selected = type == t,
                         onClick = { type = t },
-                        label = { Text(t.label) },
+                        label = { Text(stringResource(t.label)) },
                     )
                 }
             }
         }
 
-        SectionCard(title = type.label) {
+        SectionCard(title = stringResource(type.label)) {
             when (type) {
-                RecordType.TEXT -> field(a, { a = it }, "Text")
-                RecordType.URL -> field(a, { a = it }, "URL (https://…)", KeyboardType.Uri)
+                RecordType.TEXT -> field(a, { a = it }, stringResource(R.string.text))
+                RecordType.URL -> field(a, { a = it }, stringResource(R.string.url_field), KeyboardType.Uri)
                 RecordType.WIFI -> {
-                    field(a, { a = it }, "Network name (SSID)")
-                    field(b, { b = it }, "Password")
+                    field(a, { a = it }, stringResource(R.string.ssid_field))
+                    field(b, { b = it }, stringResource(R.string.password))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Open", "WPA", "WPA2").forEach { s ->
-                            FilterChip(selected = security == s, onClick = { security = s }, label = { Text(s) })
+                        listOf(stringResource(R.string.open_network), "WPA", "WPA2").forEach { s ->
+                            FilterChip(selected = security == s, onClick = { security = s }, label = { Text(if (s == stringResource(R.string.open_network)) stringResource(R.string.open_network) else s) })
                         }
                     }
                 }
                 RecordType.CONTACT -> {
-                    field(a, { a = it }, "Full name")
-                    field(b, { b = it }, "Phone", KeyboardType.Phone)
-                    field(c, { c = it }, "Email", KeyboardType.Email)
-                    field(d, { d = it }, "Organisation")
+                    field(a, { a = it }, stringResource(R.string.full_name))
+                    field(b, { b = it }, stringResource(R.string.phone), KeyboardType.Phone)
+                    field(c, { c = it }, stringResource(R.string.email), KeyboardType.Email)
+                    field(d, { d = it }, stringResource(R.string.organisation))
                 }
-                RecordType.PHONE -> field(a, { a = it }, "Phone number", KeyboardType.Phone)
+                RecordType.PHONE -> field(a, { a = it }, stringResource(R.string.phone_number), KeyboardType.Phone)
                 RecordType.SMS -> {
-                    field(a, { a = it }, "Phone number", KeyboardType.Phone)
-                    field(b, { b = it }, "Message")
+                    field(a, { a = it }, stringResource(R.string.phone_number), KeyboardType.Phone)
+                    field(b, { b = it }, stringResource(R.string.message))
                 }
                 RecordType.EMAIL -> {
-                    field(a, { a = it }, "Address", KeyboardType.Email)
-                    field(b, { b = it }, "Subject")
-                    field(c, { c = it }, "Body")
+                    field(a, { a = it }, stringResource(R.string.address), KeyboardType.Email)
+                    field(b, { b = it }, stringResource(R.string.subject))
+                    field(c, { c = it }, stringResource(R.string.body))
                 }
                 RecordType.LOCATION -> {
-                    field(a, { a = it }, "Latitude", KeyboardType.Number)
-                    field(b, { b = it }, "Longitude", KeyboardType.Number)
+                    field(a, { a = it }, stringResource(R.string.latitude), KeyboardType.Number)
+                    field(b, { b = it }, stringResource(R.string.longitude), KeyboardType.Number)
                 }
-                RecordType.APP -> field(a, { a = it }, "Package name (com.example.app)")
+                RecordType.APP -> field(a, { a = it }, stringResource(R.string.package_name))
                 RecordType.CUSTOM -> {
-                    field(a, { a = it }, "MIME type (application/json)")
-                    field(b, { b = it }, "Payload")
+                    field(a, { a = it }, stringResource(R.string.mime_type))
+                    field(b, { b = it }, stringResource(R.string.payload))
                 }
             }
         }
@@ -111,7 +113,7 @@ fun WriteScreen(vm: NfcViewModel) {
             modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(Icons.Outlined.Save, null)
-            Text("  Write to tag")
+            Text(stringResource(R.string.write_to_tag), modifier = Modifier.padding(start = 8.dp))
         }
     }
 }

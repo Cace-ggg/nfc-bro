@@ -18,12 +18,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.os.ConfigurationCompat
+import it.zorn.nfcbro.R
 import it.zorn.nfcbro.data.HistoryEntry
 import it.zorn.nfcbro.data.Store
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -32,7 +37,7 @@ fun HistoryScreen(onBack: () -> Unit) {
     val history by Store.history.collectAsState()
 
     if (history.isEmpty()) {
-        EmptyState(icon = { Icon(Icons.Outlined.History, null, Modifier.size(72.dp)) }, text = "No scans yet")
+        EmptyState(icon = { Icon(Icons.Outlined.History, null, Modifier.size(72.dp)) }, text = stringResource(R.string.no_scans))
         return
     }
 
@@ -42,17 +47,17 @@ fun HistoryScreen(onBack: () -> Unit) {
     ) {
         item {
             OutlinedButton(onClick = { Store.clearHistory() }, modifier = Modifier.fillMaxWidth()) {
-                Text("Clear history")
+                Text(stringResource(R.string.clear_history))
             }
         }
         items(history) { entry -> HistoryCard(entry) }
     }
 }
 
-private val timeFormat = SimpleDateFormat("d MMM yyyy · HH:mm", Locale.getDefault())
-
 @Composable
 private fun HistoryCard(entry: HistoryEntry) {
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.getDefault()
+    val timeFormat = remember(locale) { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(entry.uid, style = MaterialTheme.typography.titleSmall.copy(fontFamily = FontFamily.Monospace))

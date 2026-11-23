@@ -1,24 +1,26 @@
 package it.zorn.nfcbro.nfc
 
+import android.content.Context
 import android.nfc.Tag
 import android.nfc.tech.MifareClassic
 import android.nfc.tech.MifareUltralight
 import android.nfc.tech.NfcV
+import it.zorn.nfcbro.R
 
 /** Reads out the raw memory of tags whose layout allows it. */
 object MemoryDumper {
 
-    fun dump(tag: Tag): OpOutcome.Dumped {
+    fun dump(context: Context, tag: Tag): OpOutcome.Dumped {
         val techs = tag.techList
         return when {
-            MifareUltralight::class.java.name in techs -> dumpUltralight(tag)
-            MifareClassic::class.java.name in techs -> dumpClassic(tag)
-            NfcV::class.java.name in techs -> dumpNfcV(tag)
-            else -> OpOutcome.Dumped(null, false, "Memory dump isn't supported for this tag type")
+            MifareUltralight::class.java.name in techs -> dumpUltralight(context, tag)
+            MifareClassic::class.java.name in techs -> dumpClassic(context, tag)
+            NfcV::class.java.name in techs -> dumpNfcV(context, tag)
+            else -> OpOutcome.Dumped(null, false, context.getString(R.string.dump_unsupported))
         }
     }
 
-    private fun dumpUltralight(tag: Tag): OpOutcome.Dumped {
+    private fun dumpUltralight(context: Context, tag: Tag): OpOutcome.Dumped {
         val mfu = MifareUltralight.get(tag)
         val lines = mutableListOf<String>()
         var total = 0
@@ -40,15 +42,15 @@ object MemoryDumper {
                     i += 4
                 }
             }
-            OpOutcome.Dumped(MemoryDump("MIFARE Ultralight", lines, total), true, "${lines.size} pages read")
-        } catch (e: Exception) {
-            OpOutcome.Dumped(null, false, e.message ?: "Read failed")
+            OpOutcome.Dumped(MemoryDump("MIFARE Ultralight", lines, total), true, context.getString(R.string.dump_pages, lines.size))
+        } catch (_: Exception) {
+            OpOutcome.Dumped(null, false, context.getString(R.string.dump_read_failed))
         } finally {
             runCatching { mfu.close() }
         }
     }
 
-    private fun dumpNfcV(tag: Tag): OpOutcome.Dumped {
+    private fun dumpNfcV(context: Context, tag: Tag): OpOutcome.Dumped {
         val nfcv = NfcV.get(tag)
         val lines = mutableListOf<String>()
         var total = 0
@@ -70,10 +72,10 @@ object MemoryDumper {
                 total += data.size
                 block++
             }
-            if (lines.isEmpty()) OpOutcome.Dumped(null, false, "No blocks could be read")
-            else OpOutcome.Dumped(MemoryDump("ISO 15693 (NfcV)", lines, total), true, "${lines.size} blocks read")
-        } catch (e: Exception) {
-            OpOutcome.Dumped(null, false, e.message ?: "Read failed")
+            if (lines.isEmpty()) OpOutcome.Dumped(null, false, context.getString(R.string.dump_no_blocks))
+            else OpOutcome.Dumped(MemoryDump("ISO 15693 (NfcV)", lines, total), true, context.getString(R.string.dump_blocks, lines.size))
+        } catch (_: Exception) {
+            OpOutcome.Dumped(null, false, context.getString(R.string.dump_read_failed))
         } finally {
             runCatching { nfcv.close() }
         }
@@ -86,7 +88,7 @@ object MemoryDumper {
         byteArrayOf(0, 0, 0, 0, 0, 0),
     )
 
-    private fun dumpClassic(tag: Tag): OpOutcome.Dumped {
+    private fun dumpClassic(context: Context, tag: Tag): OpOutcome.Dumped {
         val mfc = MifareClassic.get(tag)
         val lines = mutableListOf<String>()
         var total = 0
@@ -96,7 +98,7 @@ object MemoryDumper {
                 val authed = CLASSIC_KEYS.any { key ->
                     runCatching { mfc.authenticateSectorWithKeyA(sector, key) }.getOrDefault(false)
                 }
-                lines += "-- Sector $sector ${if (authed) "" else "(auth failed)"}"
+                lines += context.getString(if (authed) R.string.dump_sector else R.string.dump_sector_failed, sector)
                 if (!authed) continue
                 val first = mfc.sectorToBlock(sector)
                 for (b in 0 until mfc.getBlockCountInSector(sector)) {
@@ -106,13 +108,13 @@ object MemoryDumper {
                         lines += "B%03d: %s  %s".format(idx, Hex.pretty(data), Hex.ascii(data))
                         total += data.size
                     } else {
-                        lines += "B%03d: <unreadable>".format(idx)
+                        lines += context.getString(R.string.dump_unreadable, "B%03d".format(idx))
                     }
                 }
             }
-            OpOutcome.Dumped(MemoryDump("MIFARE Classic", lines, total), true, "$total bytes read")
-        } catch (e: Exception) {
-            OpOutcome.Dumped(null, false, e.message ?: "Read failed")
+            OpOutcome.Dumped(MemoryDump("MIFARE Classic", lines, total), true, context.getString(R.string.dump_bytes, total))
+        } catch (_: Exception) {
+            OpOutcome.Dumped(null, false, context.getString(R.string.dump_read_failed))
         } finally {
             runCatching { mfc.close() }
         }

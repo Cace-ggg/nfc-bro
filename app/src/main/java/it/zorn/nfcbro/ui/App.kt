@@ -29,10 +29,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import it.zorn.nfcbro.R
 import it.zorn.nfcbro.nfc.OpOutcome
 import it.zorn.nfcbro.ui.screens.EmulateScreen
 import it.zorn.nfcbro.ui.screens.HistoryScreen
@@ -52,20 +55,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 
-private enum class Tab(val label: String, val icon: ImageVector) {
-    READ("Read", Icons.Outlined.Nfc),
-    WRITE("Write", Icons.Outlined.Edit),
-    EMULATE("Emulate", Icons.Outlined.Contactless),
-    TOOLS("Tools", Icons.Outlined.Build),
+private enum class Tab(val label: Int, val icon: ImageVector) {
+    READ(R.string.read, Icons.Outlined.Nfc),
+    WRITE(R.string.write, Icons.Outlined.Edit),
+    EMULATE(R.string.emulate, Icons.Outlined.Contactless),
+    TOOLS(R.string.tools, Icons.Outlined.Build),
 }
 
-private enum class Overlay { HISTORY, SETTINGS }
+private enum class Overlay(val label: Int) { HISTORY(R.string.history), SETTINGS(R.string.settings) }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(vm: NfcViewModel, startTab: String? = null, startOverlay: String? = null) {
-    var tab by remember { mutableStateOf(startTab?.let { runCatching { Tab.valueOf(it) }.getOrNull() } ?: Tab.READ) }
-    var overlay by remember { mutableStateOf(startOverlay?.let { runCatching { Overlay.valueOf(it) }.getOrNull() }) }
+    var tab by rememberSaveable { mutableStateOf(startTab?.let { runCatching { Tab.valueOf(it) }.getOrNull() } ?: Tab.READ) }
+    var overlay by rememberSaveable { mutableStateOf(startOverlay?.let { runCatching { Overlay.valueOf(it) }.getOrNull() }) }
 
     val awaiting by vm.awaiting.collectAsState()
     val result by vm.lastResult.collectAsState()
@@ -81,25 +84,25 @@ fun App(vm: NfcViewModel, startTab: String? = null, startOverlay: String? = null
         }
     }
 
-    val title = overlay?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: tab.label
+    val title = stringResource(overlay?.label ?: tab.label)
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (overlay == null) "NFC Bro" else title) },
+                title = { Text(if (overlay == null) stringResource(R.string.app_name) else title) },
                 navigationIcon = {
                     if (overlay != null) {
                         IconButton(onClick = { overlay = null }) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = { overlay = Overlay.HISTORY }) {
-                        Icon(Icons.Outlined.History, contentDescription = "History")
+                        Icon(Icons.Outlined.History, contentDescription = stringResource(R.string.history))
                     }
                     IconButton(onClick = { overlay = Overlay.SETTINGS }) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Settings")
+                        Icon(Icons.Outlined.Settings, contentDescription = stringResource(R.string.settings))
                     }
                 },
             )
@@ -111,8 +114,8 @@ fun App(vm: NfcViewModel, startTab: String? = null, startOverlay: String? = null
                         NavigationBarItem(
                             selected = tab == t,
                             onClick = { tab = t },
-                            icon = { Icon(t.icon, contentDescription = t.label) },
-                            label = { Text(t.label) },
+                            icon = { Icon(t.icon, contentDescription = stringResource(t.label)) },
+                            label = { Text(stringResource(t.label)) },
                         )
                     }
                 }
@@ -142,15 +145,15 @@ fun App(vm: NfcViewModel, startTab: String? = null, startOverlay: String? = null
     awaiting?.let { pending ->
         AlertDialog(
             onDismissRequest = { vm.cancel() },
-            title = { Text("Ready to scan") },
+            title = { Text(stringResource(R.string.ready_to_scan)) },
             text = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                    Text(pending.prompt)
+                    Text(stringResource(pending.prompt))
                 }
             },
             confirmButton = {
-                TextButton(onClick = { vm.cancel() }) { Text("Cancel") }
+                TextButton(onClick = { vm.cancel() }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -168,15 +171,15 @@ private fun NfcBanner(state: NfcState) {
         modifier = Modifier.padding(12.dp),
     ) {
         Text(
-            if (state == NfcState.MISSING) "This device has no NFC hardware."
-            else "NFC is turned off.",
+            if (state == NfcState.MISSING) stringResource(R.string.no_nfc)
+            else stringResource(R.string.nfc_off),
             style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
         )
         if (state == NfcState.DISABLED) {
             Row {
                 TextButton(onClick = {
                     context.startActivity(Intent(Settings.ACTION_NFC_SETTINGS))
-                }) { Text("Open NFC settings") }
+                }) { Text(stringResource(R.string.open_nfc_settings)) }
             }
         }
     }

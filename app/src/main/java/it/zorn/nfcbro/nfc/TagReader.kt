@@ -1,5 +1,6 @@
 package it.zorn.nfcbro.nfc
 
+import android.content.Context
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.nfc.tech.NfcA
@@ -11,7 +12,7 @@ import android.nfc.tech.Ndef
  */
 object TagReader {
 
-    fun read(tag: Tag): TagInfo {
+    fun read(context: Context, tag: Tag): TagInfo {
         val techs = tag.techList.map { TagTech.shortTech(it) }
 
         val nfcA = runCatching { NfcA.get(tag) }.getOrNull()
@@ -24,13 +25,13 @@ object TagReader {
 
         val ndef = runCatching { Ndef.get(tag) }.getOrNull()
         val cached = ndef?.cachedNdefMessage
-        val records = NdefParser.parse(cached)
+        val records = NdefParser.parse(context, cached)
 
         return TagInfo(
             uid = Hex.pretty(tag.id),
             techList = techs,
-            typeLabel = TagTech.typeLabel(tag),
-            manufacturer = TagTech.manufacturer(tag.id),
+            typeLabel = TagTech.typeLabel(context, tag),
+            manufacturer = TagTech.manufacturer(context, tag.id),
             atqa = atqa,
             sak = sak,
             ats = ats,

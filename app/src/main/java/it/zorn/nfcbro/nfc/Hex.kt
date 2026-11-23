@@ -1,6 +1,8 @@
 package it.zorn.nfcbro.nfc
 
 object Hex {
+    internal class InputException(val invalidCharacter: Boolean, message: String) : IllegalArgumentException(message)
+
     private const val DIGITS = "0123456789ABCDEF"
 
     fun encode(bytes: ByteArray, separator: String = ""): String {
@@ -20,13 +22,13 @@ object Hex {
     /** Parse a hex string, ignoring spaces, colons and dashes. Throws on odd/invalid input. */
     fun decode(input: String): ByteArray {
         val clean = input.filterNot { it == ' ' || it == ':' || it == '-' || it == '\n' || it == '\t' }
-        require(clean.length % 2 == 0) { "Hex length must be even" }
+        if (clean.length % 2 != 0) throw InputException(false, "Hex length must be even")
         val out = ByteArray(clean.length / 2)
         var i = 0
         while (i < clean.length) {
             val hi = Character.digit(clean[i], 16)
             val lo = Character.digit(clean[i + 1], 16)
-            require(hi >= 0 && lo >= 0) { "Invalid hex character" }
+            if (hi < 0 || lo < 0) throw InputException(true, "Invalid hex character")
             out[i / 2] = ((hi shl 4) or lo).toByte()
             i += 2
         }

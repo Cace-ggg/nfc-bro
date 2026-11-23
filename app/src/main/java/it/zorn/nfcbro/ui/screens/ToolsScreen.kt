@@ -33,13 +33,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import it.zorn.nfcbro.R
 import it.zorn.nfcbro.nfc.CommandBatch
+import it.zorn.nfcbro.nfc.BatchInputException
 import it.zorn.nfcbro.nfc.OpOutcome
 import it.zorn.nfcbro.ui.NfcViewModel
 import it.zorn.nfcbro.ui.Pending
@@ -57,11 +62,11 @@ fun ToolsScreen(vm: NfcViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(title = "Tag operations") {
-            ToolButton("Read memory dump", Icons.Outlined.Memory) { vm.start(Pending.Dump) }
-            ToolButton("Erase tag", Icons.Outlined.DeleteOutline) { vm.start(Pending.Erase) }
-            ToolButton("Format to NDEF", Icons.Outlined.Refresh) { vm.start(Pending.Format) }
-            ToolButton("Lock — make read-only", Icons.Outlined.Lock) { confirmLock = true }
+        SectionCard(title = stringResource(R.string.tag_operations)) {
+            ToolButton(stringResource(R.string.read_memory_dump), Icons.Outlined.Memory) { vm.start(Pending.Dump) }
+            ToolButton(stringResource(R.string.erase_tag), Icons.Outlined.DeleteOutline) { vm.start(Pending.Erase) }
+            ToolButton(stringResource(R.string.format_ndef), Icons.Outlined.Refresh) { vm.start(Pending.Format) }
+            ToolButton(stringResource(R.string.lock_read_only), Icons.Outlined.Lock) { confirmLock = true }
         }
 
         ApduConsole(vm)
@@ -70,15 +75,15 @@ fun ToolsScreen(vm: NfcViewModel) {
     if (confirmLock) {
         AlertDialog(
             onDismissRequest = { confirmLock = false },
-            title = { Text("Lock this tag?") },
-            text = { Text("Making a tag read-only is permanent and cannot be undone.") },
+            title = { Text(stringResource(R.string.lock_prompt)) },
+            text = { Text(stringResource(R.string.lock_warning)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmLock = false
                     vm.start(Pending.Lock)
-                }) { Text("Lock") }
+                }) { Text(stringResource(R.string.lock)) }
             },
-            dismissButton = { TextButton(onClick = { confirmLock = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmLock = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -97,23 +102,30 @@ private fun ApduConsole(vm: NfcViewModel) {
     val requiresConfirmation = connection != null && batch?.requiresConfirmation(connection.isApdu) == true
     val inputError = when {
         input.isBlank() -> null
-        batch == null -> parsed.exceptionOrNull()?.message
-        connection?.isApdu == true && batch.hasShortApdu -> "Each APDU needs at least four header bytes."
+        batch == null -> (parsed.exceptionOrNull() as? BatchInputException)?.let {
+            val message = stringResource(it.resource)
+            if (it.line == null) message else stringResource(R.string.batch_line_error, it.line, message)
+        }
+        connection?.isApdu == true && batch.hasShortApdu -> stringResource(R.string.apdu_short)
         else -> null
     }
-    val transcript = remember(log) { log.joinToString("\n\n") { it.transcript() } }
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val transcript = remember(log, context, configuration) {
+        log.joinToString("\n\n") { result -> result.transcript { id, args -> context.getString(id, *args) } }
+    }
     val clipboard = LocalClipboardManager.current
 
-    SectionCard(title = "Advanced · APDU console") {
-        Text(if (connection == null) state.message else "Connected via ${connection.transport} · ${connection.uid}")
+    SectionCard(title = stringResource(R.string.apdu_console)) {
+        Text(if (connection == null) stringResource(state.message) else stringResource(R.string.nfc_connected, connection.transport, connection.uid))
         if (connection != null) {
-            OutlinedButton(onClick = vm::disconnectRaw) { Text("Disconnect") }
+            OutlinedButton(onClick = vm::disconnectRaw) { Text(stringResource(R.string.disconnect)) }
         }
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
-            label = { Text("Hex commands (one per line)") },
-            supportingText = { Text(inputError ?: "Example: 00 A4 04 00 07 D2 76 00 00 85 01 01 00") },
+            label = { Text(stringResource(R.string.apdu_input)) },
+            supportingText = { Text(inputError ?: stringResource(R.string.apdu_example)) },
             isError = inputError != null,
             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
             modifier = Modifier.fillMaxWidth(),
@@ -122,7 +134,7 @@ private fun ApduConsole(vm: NfcViewModel) {
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = stopOnError, onCheckedChange = { stopOnError = it }, enabled = !state.busy)
-            Text("Stop batch on card error")
+            Text(stringResource(R.string.batch_stop))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
@@ -130,10 +142,10 @@ private fun ApduConsole(vm: NfcViewModel) {
                 onCheckedChange = { allowWrites = it },
                 enabled = connection != null && !state.busy,
             )
-            Text("Allow writes and unrecognized commands")
+            Text(stringResource(R.string.allow_writes))
         }
         if (requiresConfirmation && !allowWrites) {
-            Text("Read-only mode: enable writes to send this input.", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.read_only_mode), style = MaterialTheme.typography.bodySmall)
         }
         Button(
             onClick = {
@@ -148,17 +160,17 @@ private fun ApduConsole(vm: NfcViewModel) {
         ) {
             Icon(Icons.AutoMirrored.Outlined.Send, null)
             Text(when {
-                state.busy -> "  Sending…"
-                (batch?.size ?: 0) > 1 -> "  Send batch"
-                else -> "  Send command"
+                state.busy -> stringResource(R.string.sending)
+                (batch?.size ?: 0) > 1 -> stringResource(R.string.send_batch)
+                else -> stringResource(R.string.send_command)
             })
         }
     }
 
     if (log.isNotEmpty()) {
-        SectionCard(title = "Communication log") {
+        SectionCard(title = stringResource(R.string.communication_log)) {
             OutlinedButton(onClick = { clipboard.setText(AnnotatedString(transcript)) }) {
-                Text("Copy full log")
+                Text(stringResource(R.string.copy_full_log))
             }
             Text(transcript, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
         }
@@ -168,15 +180,15 @@ private fun ApduConsole(vm: NfcViewModel) {
     if (toConfirm != null && connection != null) {
         AlertDialog(
             onDismissRequest = { confirmation = null },
-            title = { Text("Send commands that may modify the tag?") },
-            text = { Text("This will send ${toConfirm.size} command(s) to the connected tag. Changes may be permanent.") },
+            title = { Text(stringResource(R.string.confirm_write_title)) },
+            text = { Text(stringResource(R.string.confirm_write_body, toConfirm.size)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmation = null
                     if (allowWrites) vm.sendRaw(toConfirm, connection.id, stopOnError, confirmed = true)
-                }) { Text("Confirm and send") }
+                }) { Text(stringResource(R.string.confirm_send)) }
             },
-            dismissButton = { TextButton(onClick = { confirmation = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmation = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -192,7 +204,7 @@ private fun ToolButton(label: String, icon: ImageVector, onClick: () -> Unit) {
 @Composable
 fun ResultDialog(outcome: OpOutcome.Dumped, onDismiss: () -> Unit) {
     val clipboard = LocalClipboardManager.current
-    val title = outcome.dump?.label ?: "Memory dump"
+    val title = outcome.dump?.label ?: stringResource(R.string.memory_dump)
     val body = outcome.dump?.lines?.joinToString("\n") ?: outcome.message
 
     AlertDialog(
@@ -208,9 +220,9 @@ fun ResultDialog(outcome: OpOutcome.Dumped, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
         dismissButton = {
-            TextButton(onClick = { clipboard.setText(AnnotatedString(body)) }) { Text("Copy") }
+            TextButton(onClick = { clipboard.setText(AnnotatedString(body)) }) { Text(stringResource(R.string.copy)) }
         },
     )
 }

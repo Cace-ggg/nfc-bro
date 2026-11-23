@@ -20,12 +20,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
+import it.zorn.nfcbro.R
 import it.zorn.nfcbro.nfc.TagInfo
 import it.zorn.nfcbro.ui.NfcViewModel
 import it.zorn.nfcbro.ui.components.KeyValue
@@ -39,7 +41,7 @@ fun ReadScreen(vm: NfcViewModel) {
 
     val tag = scan
     if (tag == null) {
-        EmptyState(icon = { Icon(Icons.Outlined.Nfc, null, Modifier.size(72.dp)) }, text = "Hold an NFC tag to the back of your phone")
+        EmptyState(icon = { Icon(Icons.Outlined.Nfc, null, Modifier.size(72.dp)) }, text = stringResource(R.string.scan_hint))
         return
     }
 
@@ -50,17 +52,17 @@ fun ReadScreen(vm: NfcViewModel) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(title = "Tag") {
-            KeyValue("UID", tag.uid, mono = true)
-            KeyValue("Type", tag.typeLabel)
-            KeyValue("Manufacturer", tag.manufacturer)
-            tag.atqa?.let { KeyValue("ATQA", it, mono = true) }
-            tag.sak?.let { KeyValue("SAK", it, mono = true) }
-            tag.ats?.let { KeyValue("ATS", it, mono = true) }
+        SectionCard(title = stringResource(R.string.tag)) {
+            KeyValue(stringResource(R.string.uid), tag.uid, mono = true)
+            KeyValue(stringResource(R.string.type), tag.typeLabel)
+            KeyValue(stringResource(R.string.manufacturer), tag.manufacturer)
+            tag.atqa?.let { KeyValue(stringResource(R.string.atqa), it, mono = true) }
+            tag.sak?.let { KeyValue(stringResource(R.string.sak), it, mono = true) }
+            tag.ats?.let { KeyValue(stringResource(R.string.ats), it, mono = true) }
             if (tag.maxSizeBytes != null) {
-                KeyValue("Capacity", "${tag.usedBytes ?: 0} / ${tag.maxSizeBytes} bytes")
+                KeyValue(stringResource(R.string.capacity), stringResource(R.string.capacity_format, tag.usedBytes ?: 0, tag.maxSizeBytes))
             }
-            tag.writable?.let { KeyValue("Writable", if (it) "Yes" else "No (read-only)") }
+            tag.writable?.let { KeyValue(stringResource(R.string.writable), if (it) stringResource(R.string.yes) else stringResource(R.string.no_read_only)) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 tag.techList.forEach { AssistChip(onClick = {}, label = { Text(it) }) }
             }
@@ -68,12 +70,12 @@ fun ReadScreen(vm: NfcViewModel) {
                 clipboard.setText(AnnotatedString(tag.uid.replace(" ", "")))
             }) {
                 Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp))
-                Text("  Copy UID")
+                Text(stringResource(R.string.copy_uid), modifier = Modifier.padding(start = 8.dp))
             }
         }
 
         if (tag.records.isNotEmpty()) {
-            SectionCard(title = "NDEF · ${tag.records.size} record${if (tag.records.size == 1) "" else "s"}") {
+            SectionCard(title = stringResource(R.string.ndef_records, tag.records.size)) {
                 tag.records.forEachIndexed { i, r ->
                     Text("${i + 1}. ${r.kind}", style = MaterialTheme.typography.titleSmall)
                     Text(r.summary, style = MaterialTheme.typography.bodyMedium)
@@ -90,7 +92,7 @@ fun ReadScreen(vm: NfcViewModel) {
                 }
             }
         } else {
-            SectionCard(title = "NDEF") { Text("No NDEF data on this tag") }
+            SectionCard(title = "NDEF") { Text(stringResource(R.string.no_ndef)) }
         }
     }
 }

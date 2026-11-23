@@ -1,5 +1,6 @@
 package it.zorn.nfcbro.nfc
 
+import it.zorn.nfcbro.R
 import java.io.IOException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -37,7 +38,8 @@ class RawCommanderTest {
         raw.connect("01") { FakeTransport { Hex.decode("6A82") } }
         val stopped = mutableListOf<CommandResult>()
         raw.execute(batch, true, stopped::add)
-        assertEquals(listOf("6A82 — File or application not found"), stopped.map { it.statusText })
+        assertEquals("6A82", stopped.single().statusHex)
+        assertEquals(R.string.sw_file_missing, stopped.single().statusResource)
         val continued = mutableListOf<CommandResult>()
         raw.execute(batch, false, continued::add)
         assertEquals(2, continued.size)
@@ -52,7 +54,7 @@ class RawCommanderTest {
         val first = raw.connection
         val log = mutableListOf<CommandResult>()
         val error = raw.execute(CommandBatch.parse("00A40000\n00B0000004"), false, log::add)
-        assertEquals("Tag removed. Tap again.", error)
+        assertEquals(R.string.nfc_removed, error)
         assertEquals(error, log.single().error)
         assertNull(raw.connection)
         assertEquals(1, tag.closes)
@@ -72,7 +74,7 @@ class RawCommanderTest {
         raw.connect("01") { tag }
         val log = mutableListOf<CommandResult>()
         val error = raw.execute(CommandBatch.parse("00A40000"), true, log::add)
-        assertEquals("NFC I/O error or timeout. Tap again.", error)
+        assertEquals(R.string.nfc_timeout, error)
         assertEquals(error, log.single().error)
         assertNull(raw.connection)
         assertEquals(2, tag.closes)

@@ -7,7 +7,10 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.content.Context
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
+import it.zorn.nfcbro.R
 import androidx.lifecycle.viewModelScope
 import it.zorn.nfcbro.data.HistoryEntry
 import it.zorn.nfcbro.data.Store
@@ -36,15 +39,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 sealed interface Pending {
-    val prompt: String
+    val prompt: Int
 
     data class Write(val message: NdefMessage) : Pending {
-        override val prompt = "Hold a writable tag to the phone"
+        override val prompt = R.string.scan_write_prompt
     }
-    data object Lock : Pending { override val prompt = "Hold a tag to lock it (permanent)" }
-    data object Erase : Pending { override val prompt = "Hold a tag to erase it" }
-    data object Format : Pending { override val prompt = "Hold a tag to format it" }
-    data object Dump : Pending { override val prompt = "Hold a tag to read its memory" }
+    data object Lock : Pending { override val prompt = R.string.scan_lock_prompt }
+    data object Erase : Pending { override val prompt = R.string.scan_erase_prompt }
+    data object Format : Pending { override val prompt = R.string.scan_format_prompt }
+    data object Dump : Pending { override val prompt = R.string.scan_dump_prompt }
 }
 
 class NfcViewModel(app: Application) : AndroidViewModel(app) {
@@ -81,6 +84,7 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Debug-only: populate a representative tag for documentation screenshots. */
     fun showSampleTag() {
+        val context = localizedContext()
         _lastScan.value = TagInfo(
             uid = "04 A2 26 B1 5C 3D 80",
             techList = listOf("NfcA", "MifareUltralight", "Ndef"),
@@ -95,8 +99,8 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
             canMakeReadOnly = true,
             isNdef = true,
             records = listOf(
-                it.zorn.nfcbro.nfc.NdefRecordInfo("URI", "https://zorn.it", "URI record", "55 04 7A 6F 72 6E 2E 69 74"),
-                it.zorn.nfcbro.nfc.NdefRecordInfo("Text", "Marco Zorn", "Language: en", "02 65 6E 4D 61 72 63 6F"),
+                it.zorn.nfcbro.nfc.NdefRecordInfo("URI", "https://zorn.it", context.getString(R.string.ndef_uri_record), "55 04 7A 6F 72 6E 2E 69 74"),
+                it.zorn.nfcbro.nfc.NdefRecordInfo(context.getString(R.string.text), "Marco Zorn", context.getString(R.string.ndef_language, "en"), "02 65 6E 4D 61 72 63 6F"),
             ),
             scannedAtMs = System.currentTimeMillis(),
         )
@@ -136,7 +140,7 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
                         if (_rawState.value.connection == null || _rawState.value.busy) return@withLock
                         if (!withContext(Dispatchers.IO) { raw.checkPresence() }) {
                             lastRawTag = null
-                            _rawState.value = RawState(message = "Tag removed. Tap again.")
+                            _rawState.value = RawState(message = R.string.nfc_removed)
                         }
                     }
                 }
@@ -146,10 +150,10 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
 
     fun disconnectRaw() {
         ignoredRawTag = lastRawTag
-        closeRaw("Disconnected. Remove the tag and tap again.")
+        closeRaw(R.string.nfc_disconnected)
     }
 
-    private fun closeRaw(message: String = RawState.WAITING) {
+    private fun closeRaw(message: Int = R.string.nfc_waiting) {
         rawRevision++
         rawTask?.cancel()
         lastRawTag = null
@@ -170,7 +174,7 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
             nfcMutex.withLock {
                 if (_rawState.value.connection?.id != connectionId) return@withLock
                 val error = withContext(Dispatchers.IO) {
-                    if (raw.connection?.id != connectionId) return@withContext "Not connected. Tap a tag."
+                    if (raw.connection?.id != connectionId) return@withContext R.string.nfc_not_connected
                     raw.execute(batch, stopOnError) { result -> _rawLog.update { it + result } }
                 }
                 _rawState.value = if (error == null) state else RawState(message = error)
@@ -193,13 +197,14 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     withContext(Dispatchers.IO) {
                         feedback()
+                        val context = localizedContext()
                         when (pending) {
                             null -> passiveRead(tag)
-                            is Pending.Write -> finish(TagWriter.write(tag, pending.message))
-                            Pending.Lock -> finish(TagWriter.makeReadOnly(tag))
-                            Pending.Erase -> finish(TagWriter.erase(tag))
-                            Pending.Format -> finish(TagWriter.format(tag))
-                            Pending.Dump -> finish(MemoryDumper.dump(tag))
+                            is Pending.Write -> finish(TagWriter.write(context, tag, pending.message))
+                            Pending.Lock -> finish(TagWriter.makeReadOnly(context, tag))
+                            Pending.Erase -> finish(TagWriter.erase(context, tag))
+                            Pending.Format -> finish(TagWriter.format(context, tag))
+                            Pending.Dump -> finish(MemoryDumper.dump(context, tag))
                         }
                     }
                 }
@@ -221,7 +226,7 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
         if (revision != rawRevision) return
         lastRawTag = if (connection != null) tag else null
         if (_rawState.value.connection?.id != connection?.id || error != null) {
-            _rawState.value = RawState(connection, error ?: RawState.WAITING)
+            _rawState.value = RawState(connection, error ?: R.string.nfc_waiting)
         }
     }
 
@@ -230,8 +235,10 @@ class NfcViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
+    private fun localizedContext(): Context = ContextCompat.getContextForLanguage(getApplication<Application>())
+
     private fun passiveRead(tag: Tag) {
-        val info = TagReader.read(tag)
+        val info = TagReader.read(localizedContext(), tag)
         _lastScan.value = info
         if (Store.settings.value.addToHistory) Store.addHistory(info.toHistoryEntry())
     }
@@ -265,13 +272,9 @@ enum class NfcState { UNKNOWN, MISSING, DISABLED, READY }
 
 data class RawState(
     val connection: RawConnection? = null,
-    val message: String = WAITING,
+    val message: Int = R.string.nfc_waiting,
     val busy: Boolean = false,
-) {
-    companion object {
-        const val WAITING = "Disconnected. Hold a tag near the phone."
-    }
-}
+)
 
 private fun TagInfo.toHistoryEntry() = HistoryEntry(
     id = "$uid-$scannedAtMs",
